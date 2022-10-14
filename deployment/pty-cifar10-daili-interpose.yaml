@@ -15,7 +15,9 @@ spec:
     - name: LD_PRELOAD
       value: /lib/interpose/libpfinterpose.so    
     # command: ["sh", "-c", "sleep infinity"]
-    command: ["sh", "-c", "python resnet-cifar10-pytorch.py"]
+    # command: ["sh", "-c", "python resnet-cifar10-pytorch.py -cf 1"]
+    # command: ["sh", "-c", "python /workspace/test/resnet-cifar10-pytorch.py -cf 1"]
+    command: ["sh", "-c", "python /workspace/test/cifar10.py"]
     volumeMounts:
     - mountPath: /dev/shm
       name: dshm
@@ -25,6 +27,8 @@ spec:
       name: intercept       
     - mountPath: /workspace/test
       name: test       
+    - mountPath: /data
+      name: data       
     - name: pflog
       mountPath: /log/pflog      
   volumes:
@@ -42,6 +46,10 @@ spec:
   - name: test
     hostPath:
       path: /home/steven/dev/DataLoaders_DALI/
+      type: Directory      
+  - name: data
+    hostPath:
+      path: /mnt/data
       type: Directory      
   - name: pflog
     hostPath:

@@ -40,6 +40,7 @@ RUN pip3 install jupyter_tensorboard torchvision scikit-image
 # EXPOSE 6006
 # jupyter notebook
 RUN pip install --extra-index-url https://developer.download.nvidia.com/compute/redist --upgrade nvidia-dali-cuda110
+RUN pip install -U scikit-learn scipy
 
 EXPOSE 8888
 
