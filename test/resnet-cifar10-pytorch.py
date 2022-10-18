@@ -15,6 +15,15 @@ import torch.nn as nn
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from base import DALIDataloader
+from cifar10 import HybridTrainPipe_CIFAR
+
+IMG_DIR = '/data/cifar10/cifar100'
+TRAIN_BS = 256
+TEST_BS = 200
+NUM_WORKERS = 4
+CROP_SIZE = 32
+CIFAR_IMAGES_NUM_TRAIN = 50000
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
@@ -58,7 +67,8 @@ def train(gpu, args):
     # Data loading code
     if(args.conf==0): 
         #pytorch dataloader
-        trainset = torchvision.datasets.CIFAR10(root='./data',
+        print("torch dataloader ...")
+        trainset = torchvision.datasets.CIFAR10(root=IMG_DIR,
                                                 train=True,
                                                 download=True,
                                                 transform=transform)
@@ -69,11 +79,12 @@ def train(gpu, args):
         trainloader = torch.utils.data.DataLoader(trainset,
                                                 batch_size=batch_size,
                                                 shuffle=False,
-                                                num_workers=4,
+                                                num_workers=NUM_WORKERS,
                                                 pin_memory=True,
                                                 sampler=trainsampler)
     else:
         #DALI dataloader
+        print("DALI dataloader ...")
         pip_train = HybridTrainPipe_CIFAR(batch_size=batch_size,
                                         num_threads=NUM_WORKERS,
                                         device_id=0, 

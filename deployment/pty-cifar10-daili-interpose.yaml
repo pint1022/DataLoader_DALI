@@ -18,6 +18,7 @@ spec:
     # command: ["sh", "-c", "python resnet-cifar10-pytorch.py -cf 1"]
     # command: ["sh", "-c", "python /workspace/test/resnet-cifar10-pytorch.py -cf 1"]
     command: ["sh", "-c", "python /workspace/test/cifar10.py"]
+    # command: ["sh", "-c", "python /workspace/test/resnet50.py data=/data/cifar10"]
     volumeMounts:
     - mountPath: /dev/shm
       name: dshm
@@ -28,7 +29,7 @@ spec:
     - mountPath: /workspace/test
       name: test       
     - mountPath: /data
-      name: data       
+      name: data1 
     - name: pflog
       mountPath: /log/pflog      
   volumes:
@@ -48,6 +49,10 @@ spec:
       path: /home/steven/dev/DataLoaders_DALI/
       type: Directory      
   - name: data
+    hostPath:
+      path: /mnt/gds-data
+      type: Directory      
+  - name: data1
     hostPath:
       path: /mnt/data
       type: Directory      
