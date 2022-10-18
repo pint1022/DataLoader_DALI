@@ -16,7 +16,7 @@ CIFAR_MEAN = [0.49139968, 0.48215827, 0.44653124]
 CIFAR_STD = [0.24703233, 0.24348505, 0.26158768]
 CIFAR_IMAGES_NUM_TRAIN = 50000
 CIFAR_IMAGES_NUM_TEST = 10000
-IMG_DIR = '/userhome/data/cifar10'
+IMG_DIR = '//data/cifar10/cifar100'
 TRAIN_BS = 256
 TEST_BS = 200
 NUM_WORKERS = 4
@@ -35,9 +35,9 @@ class HybridTrainPipe_CIFAR(Pipeline):
         self.uniform = ops.Uniform(range=(0., 1.))
         self.crop = ops.Crop(device=dali_device, crop_h=crop, crop_w=crop)
         self.cmnp = ops.CropMirrorNormalize(device="gpu",
-                                            output_dtype=types.FLOAT,
+                                            # output_dtype=types.FLOAT,
                                             output_layout=types.NCHW,
-                                            image_type=types.RGB,
+                                            # image_type=types.RGB,
                                             mean=[0.49139968 * 255., 0.48215827 * 255., 0.44653124 * 255.],
                                             std=[0.24703233 * 255., 0.24348505 * 255., 0.26158768 * 255.]
                                             )
@@ -66,9 +66,9 @@ class HybridTestPipe_CIFAR(Pipeline):
         self.input = ops.ExternalSource()
         self.input_label = ops.ExternalSource()
         self.cmnp = ops.CropMirrorNormalize(device="gpu",
-                                            output_dtype=types.FLOAT,
+                                            # output_dtype=types.FLOAT,
                                             output_layout=types.NCHW,
-                                            image_type=types.RGB,
+                                            # image_type=types.RGB,
                                             mean=[0.49139968 * 255., 0.48215827 * 255., 0.44653124 * 255.],
                                             std=[0.24703233 * 255., 0.24348505 * 255., 0.26158768 * 255.]
                                             )
@@ -149,6 +149,8 @@ class CIFAR_INPUT_ITER():
 
     next = __next__
 
+
+
 if __name__ == '__main__':
     # iteration of DALI dataloader
     pip_train = HybridTrainPipe_CIFAR(batch_size=TRAIN_BS, num_threads=NUM_WORKERS, device_id=0, data_dir=IMG_DIR, crop=CROP_SIZE, world_size=1, local_rank=0, cutout=0)
@@ -184,6 +186,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
     ])
+    
     train_dst = CIFAR10(root=IMG_DIR, train=True, download=True, transform=transform_train)
     train_loader = torch.utils.data.DataLoader(train_dst, batch_size=TRAIN_BS, shuffle=True, pin_memory=True, num_workers=NUM_WORKERS)
     transform_test = transforms.Compose([
@@ -192,7 +195,7 @@ if __name__ == '__main__':
     ])
     test_dst = CIFAR10(root=IMG_DIR, train=False, download=True, transform=transform_test)
     test_iter = torch.utils.data.DataLoader(test_dst, batch_size=TEST_BS, shuffle=False, pin_memory=True, num_workers=NUM_WORKERS)
-    print("[PyTorch] train dataloader length: %d"%len(train_loader))
+    print("[PyTorch] train torch dataloader length: %d"%len(train_loader))
     print('[PyTorch] start iterate train dataloader')
     start = time.time()
     for i, data in enumerate(train_loader):
@@ -202,7 +205,7 @@ if __name__ == '__main__':
     train_time = end-start
     print('[PyTorch] end train dataloader iteration')
 
-    print("[PyTorch] test dataloader length: %d"%len(test_loader))
+    print("[PyTorch] test torch dataloader length: %d"%len(test_loader))
     print('[PyTorch] start iterate test dataloader')
     start = time.time()
     for i, data in enumerate(test_loader):
