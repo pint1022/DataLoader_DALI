@@ -8,16 +8,15 @@ spec:
     image: centaurusinfra/torch-dali-jupyter:latest
     env:
     - name: CUDA_VISIBLE_DEVICES
-      value: 6,7      
-    env:
+      value: "6,7"
     - name: PFLOG
       value: /log/pflog    
     - name: LD_PRELOAD
       value: /lib/interpose/libpfinterpose.so    
-    # command: ["sh", "-c", "sleep infinity"]
-    # command: ["sh", "-c", "python resnet-cifar10-pytorch.py -cf 1"]
+    command: ["sh", "-c", "sleep infinity"]
+    # command: ["sh", "-c", "python resnet-cifar10-pytorch.py -cf 0"]
     # command: ["sh", "-c", "python /workspace/test/resnet-cifar10-pytorch.py -cf 1"]
-    command: ["sh", "-c", "python /workspace/test/cifar10.py"]
+    # command: ["sh", "-c", "python /workspace/test/cifar10.py"]
     # command: ["sh", "-c", "python /workspace/test/resnet50.py data=/data/cifar10"]
     volumeMounts:
     - mountPath: /dev/shm
@@ -29,7 +28,13 @@ spec:
     - mountPath: /workspace/test
       name: test       
     - mountPath: /data
-      name: data1 
+      name: data 
+    - mountPath: /data/imagenet/train-jpeg/
+      name: imagenet-train 
+    - mountPath: /data/imagenet/val-jpeg/
+      name: imagenet-val 
+    - mountPath: /avatar
+      name: avatar
     - name: pflog
       mountPath: /log/pflog      
   volumes:
@@ -48,9 +53,21 @@ spec:
     hostPath:
       path: /home/steven/dev/DataLoaders_DALI/
       type: Directory      
+  - name: avatar
+    hostPath:
+      path: /home/steven/dev/alnair/use-case
+      type: Directory      
   - name: data
     hostPath:
       path: /mnt/gds-data
+      type: Directory      
+  - name: imagenet-train
+    hostPath:
+      path: /mnt/gds-data/imagenet/train
+      type: Directory      
+  - name: imagenet-val
+    hostPath:
+      path: /mnt/gds-data/imagenet/val
       type: Directory      
   - name: data1
     hostPath:
