@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gds-avatar-jupyter
+spec:
+  selector:
+    matchLabels:
+      run: gds-avatar-jupyter
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: gds-avatar-jupyter
+    spec:
+      containers:
+      - name: gds-avatar-jupyter
+        image: centaurusinfra/avatar-jupyter:latest
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: 0,1,2,3          
+        - name: PFLOG
+          value: /log/pflog    
+        - name: LD_PRELOAD
+          value: /lib/interpose/libpfinterpose.so          
+        ports:
+          - containerPort: 8888
+            name: jupyter-svc  
+        # command: ["sh", "-c", "sleep infinity"]
+        command: ["sh", "-c", "jupyter lab --no-browser --allow-root --ip=0.0.0.0"]
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+        - mountPath: /lib/interpose/
+          name: intercept       
+        - mountPath: /data
+          name: data 
+        - mountPath: /model
+          name: data 
+        - mountPath: /root/scripts
+          name: avatar
+        - mountPath: /root/data
+          name: avatar-data
+        - name: pflog
+          mountPath: /log/pflog 
+      volumes:
+      - name: dshm  # this is to trick pytorch when large size of shared memory is needed
+        emptyDir:
+          medium: Memory
+      - name: intercept
+        hostPath:
+          path: /home/steven/dev/alnair/alnair-profiler/profiler-hook-lib/build/lib
+          type: Directory
+      - name: avatar
+        hostPath:
+          path: /mnt/gds/alnair/use-case
+          type: Directory      
+      - name: data
+        hostPath:
+          path: /mnt/gds-data
+          type: Directory      
+      - name: avatar-data
+        hostPath:
+          path: /nfs_2/Avatar/
+          type: Directory      
+      - name: pflog
+        hostPath:
+          path: /var/lib/alnair/workspace/ 
+
+  # restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gds-avatar-jupyter
+spec:
+  type: NodePort
+  selector:
+    run: gds-avatar-jupyter
+  ports:
+  - targetPort: jupyter-svc
+    port: 8888
+    nodePort: 32666

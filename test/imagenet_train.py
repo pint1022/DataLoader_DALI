@@ -1,34 +1,3 @@
-Skip to content
-Search or jump to…
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@pint1022 
-pytorch
-/
-examples
-Public
-Code
-Issues
-140
-Pull requests
-27
-Actions
-Projects
-Security
-Insights
-examples/imagenet/main.py /
-@hudeven
-hudeven Fix device mismatch issue in #1071 (#1073)
-…
-Latest commit f5bb60f 24 days ago
- History
- 37 contributors
-@soumith@colesbury@developer0hye@msaroufim@Maratyszcza@hudeven@yzs981130@YuliyaPylypiv@teng-li@cgnorthcutt@vipinpillai@timothygebhard
-511 lines (434 sloc)  19.9 KB
-
 import argparse
 import os
 import random
@@ -51,6 +20,10 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
+
+from nvidia.dali import pipeline_def
+import nvidia.dali.fn as fn
+import nvidia.dali.types as types
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -111,6 +84,21 @@ parser.add_argument('--dummy', action='store_true', help="use fake data to bench
 
 best_acc1 = 0
 
+imagenet_data = "/data/imagenet"
+@pipeline_def(batch_size=256, num_threads=4, device_id=0)
+def wds_pipeline(wds_data=imagenet_data):
+    img_raw, cls = fn.readers.webdataset(
+        paths=wds_data,
+        ext=["jpg", "cls"],
+        missing_component_behavior="error")
+    img = fn.decoders.image(img_raw, device="mixed", output_type=types.RGB)
+    resized = fn.resize(img, device="gpu", resize_shorter=256.)
+    output = fn.crop_mirror_normalize(
+        resized,
+        dtype=types.FLOAT,
+        crop=(224, 224),
+        mean=[0., 0., 0.],
+        std=[1., 1., 1.])
 
 def main():
     args = parser.parse_args()
@@ -259,42 +247,56 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset = datasets.FakeData(1281167, (3, 224, 224), 1000, transforms.ToTensor())
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
     else:
-        traindir = os.path.join(args.data, 'train')
-        valdir = os.path.join(args.data, 'val')
+        traindir = os.path.join(args.data, 'train-jpeg')
+        valdir = os.path.join(args.data, 'val-jpeg')
+
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-        train_dataset = datasets.ImageFolder(
-            traindir,
-            transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ]))
+        pipe_train = wds_pipeline(traindir)
+        pipe_train.build()
+        pipe_val = wds_pipeline(valdir)
+        pipe_val.build()
 
-        val_dataset = datasets.ImageFolder(
-            valdir,
-            transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                normalize,
-            ]))
+        # train_dataset = datasets.ImageFolder(
+        #     traindir,
+        #     transforms.Compose([
+        #         transforms.RandomResizedCrop(224),
+        #         transforms.RandomHorizontalFlip(),
+        #         transforms.ToTensor(),
+        #         normalize,
+        #     ]))
 
-    if args.distributed:
+        # val_dataset = datasets.ImageFolder(
+        #     valdir,
+        #     transforms.Compose([
+        #         transforms.Resize(256),
+        #         transforms.CenterCrop(224),
+        #         transforms.ToTensor(),
+        #         normalize,
+        #     ]))
+
+    if args.distributed:     
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
+        val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)        
     else:
         train_sampler = None
         val_sampler = None
 
+
+    # train_loader = torch.utils.data.DataLoader(
+    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+
+    # val_loader = torch.utils.data.DataLoader(
+    #     val_dataset, batch_size=args.batch_size, shuffle=False,
+    #     num_workers=args.workers, pin_memory=True, sampler=val_sampler)
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        pipe_train, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=args.batch_size, shuffle=False,
+        pipe_val, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     if args.evaluate:
