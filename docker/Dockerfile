@@ -16,16 +16,15 @@
 
 # ENV HOME /home/me
 
-FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
+FROM pytorch/pytorch:1.12.0-cuda11.3-cudnn8-devel
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
 
-RUN apt-get update && apt-get install -y git vim
+RUN apt-get update && apt-get install -y git vim 
 RUN apt-get install -y cuda-toolkit-11-4
 
 
 RUN pip install scipy dataset pytorch-ignite matplotlib seaborn
 RUN mkdir /root/{data,logs,scripts}
-WORKDIR /root/scripts
 
 RUN apt-get install -y nodejs
 RUN pip3 install jupyter matplotlib
@@ -41,8 +40,14 @@ RUN pip3 install jupyter_tensorboard torchvision scikit-image
 # jupyter notebook
 RUN pip install --extra-index-url https://developer.download.nvidia.com/compute/redist --upgrade nvidia-dali-cuda110
 RUN pip install -U scikit-learn scipy
+# RUN apt-get update && DEBIAN_FRONTEND="noninteractive" TZ="America/San_Francisco" apt-get install -y tzdata
 
+# RUN apt update
+# RUN apt install -y software-properties-common
+# RUN add-apt-repository ppa:deadsnakes/ppa
+# RUN apt install -y python3.9
 EXPOSE 8888
+WORKDIR /root/scripts
 
 # COPY start.sh /
 
