@@ -159,8 +159,8 @@ def main():
         args.batch_size = 64
         args.data = []
         args.sync_bn = False
-        args.data.append('/data/imagenet/train-jpeg/')
-        args.data.append('/data/imagenet/val-jpeg/')
+        args.data.append('/root/data/imagenet/train/')
+        args.data.append('/root/data/imagenet/val/')
         print("Test mode - no DDP, no apex, RN50, 10 iterations")
 
     if not len(args.data):

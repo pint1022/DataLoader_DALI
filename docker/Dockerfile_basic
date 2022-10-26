@@ -52,7 +52,3 @@ EXPOSE 8888
 # ENV CU_HOOK_DEBUG=1
 
 COPY test/*.py ./ 
-COPY test/git-lfs-linux-amd64-v3.2.0.tar.gz ./ 
-RUN tar -zxvf ./git-lfs-linux-amd64-v3.2.0.tar.gz 
-RUN cd git-lfs-3.2.0
-RUN bash git-lfs-3.2.0/install.sh
