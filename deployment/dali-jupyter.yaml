@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
       - name: dali-gds-jupyter
-        image: centaurusinfra/avatar-jupyter:latest
+        image:  centaurusinfra/torch-dali-jupyter:latest
+        # image: cschranz/gpu-jupyter:v1.4_cuda-11.6_ubuntu-20.04_python-only
         env:
         - name: CUDA_VISIBLE_DEVICES
           value: 0,1,2,3          
@@ -33,7 +34,7 @@ spec:
         - mountPath: /lib/interpose/
           name: intercept       
         - mountPath: /root/scripts
-          name: codes
+          name: dali-example
         - mountPath: /root/data
           name: data
         - name: pflog
@@ -46,6 +47,10 @@ spec:
         hostPath:
           path: /home/steven/dev/alnair/alnair-profiler/profiler-hook-lib/build/lib
           type: Directory
+      - name: dali-example
+        hostPath:
+          path: /home/steven/dev/DataLoaders_DALI/
+          type: Directory            
       - name: codes
         hostPath:
           path: /mnt/gds
@@ -72,3 +77,8 @@ spec:
   - targetPort: jupyter-svc
     port: 8888
     nodePort: 30888
+  # name: tb-svc
+  #   protocol: tcp
+  #   targetPort: 6006
+  #   port: 6006
+    
