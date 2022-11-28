@@ -46,8 +46,9 @@ def main():
 def train(gpu, args):
     alnair_pf = os.getenv('PFLOG')
     if (alnair_pf  is None):
-        alnair_pf= "./test"     
-    model = torch.hub.load('pytorch/vision:v0.9.0', 'resnet50', pretrained=False)
+        alnair_pf= "./"     
+    # model = torch.hub.load('pytorch/vision:v0.9.0', 'resnet50', pretrained=False)
+    model = torchvision.models.densenet121(pretrained=True, progress=True)    
     rank = args.nr * args.gpus + gpu
     dist.init_process_group(backend='nccl', init_method='env://', world_size=args.world_size, rank=rank)
     torch.manual_seed(0)
@@ -93,7 +94,7 @@ def train(gpu, args):
                                         world_size=1, 
                                         local_rank=0, 
                                         cutout=0)
-        train_loader = DALIDataloader(pipeline=pip_train,
+        trainloader = DALIDataloader(pipeline=pip_train,
                                     size=CIFAR_IMAGES_NUM_TRAIN, 
                                     batch_size=batch_size, 
                                     onehot_label=True)     

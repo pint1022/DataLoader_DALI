@@ -54,6 +54,10 @@ spec:
         hostPath:
           path: /mnt/gds-data
           type: Directory          
+      - name: persist
+        hostPath:
+          path: /nfs_3
+          type: Directory          
       - name: pflog
         hostPath:
           path: /var/lib/alnair/workspace/ 

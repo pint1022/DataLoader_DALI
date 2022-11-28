@@ -44,30 +44,28 @@ NUM_WORKERS = 4
 VAL_SIZE = 256
 CROP_SIZE = 224
 
+class HybridValPipe(Pipeline):
+    def __init__(self, batch_size, num_threads, device_id, data_dir, crop, size, local_rank=0, world_size=1):
+        super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
+        self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size,
+                                    random_shuffle=False)
+        self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
+        self.res = ops.Resize(device="gpu", resize_shorter=size, interp_type=types.INTERP_TRIANGULAR)
+        self.cmnp = ops.CropMirrorNormalize(device="gpu",
+                                            output_dtype=types.FLOAT,
+                                            output_layout=types.NCHW,
+                                            crop=(crop, crop),
+                                            image_type=types.RGB,
+                                            mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                            std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
 
-# class HybridCocoPipe(Pipeline):
-#     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0, world_size=1):
-#         super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
-#         # self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
-#         self.input = read_data(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
-#         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-#         self.res = ops.RandomResizedCrop(device="gpu", size=crop, random_area=[0.08, 1.25])
-#         self.cmnp = ops.CropMirrorNormalize(device="gpu",
-#                                             output_dtype=types.FLOAT,
-#                                             output_layout=types.NCHW,
-#                                             image_type=types.RGB,
-#                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-#                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
-#         self.coin = ops.CoinFlip(probability=0.5)
-
-#     def define_graph(self):
-#         rng = self.coin()
-#         self.jpegs, self.labels = self.input(name="Reader")
-#         images = self.decode(self.jpegs)
-#         images = self.res(images)
-#         output = self.cmnp(images, mirror=rng)
-#         return [output, self.labels]
-
+    def define_graph(self):
+        self.jpegs, self.labels = self.input(name="Reader")
+        images = self.decode(self.jpegs)
+        images = self.res(images)
+        output = self.cmnp(images)
+        return [output, self.labels]
+    
 class HybridTrainPipe(Pipeline):
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0, world_size=1):
         super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
@@ -141,6 +139,8 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
+parser.add_argument('--dali', action='store_true',
+                    help='DALI dataloader to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -151,20 +151,20 @@ parser.add_argument('--dummy', action='store_true', help="use fake data to bench
 best_acc1 = 0
 
 imagenet_data = "/root/data/imagenet"
-@pipeline_def(batch_size=256, num_threads=4, device_id=0)
-def wds_pipeline(wds_data=imagenet_data):
-    img_raw, cls = fn.readers.webdataset(
-        paths=wds_data,
-        ext=["jpg", "cls"],
-        missing_component_behavior="error")
-    img = fn.decoders.image(img_raw, device="mixed", output_type=types.RGB)
-    resized = fn.resize(img, device="gpu", resize_shorter=256.)
-    output = fn.crop_mirror_normalize(
-        resized,
-        dtype=types.FLOAT,
-        crop=(224, 224),
-        mean=[0., 0., 0.],
-        std=[1., 1., 1.])
+# @pipeline_def(batch_size=256, num_threads=4, device_id=0)
+# def wds_pipeline(wds_data=imagenet_data):
+#     img_raw, cls = fn.readers.webdataset(
+#         paths=wds_data,
+#         ext=["jpg", "cls"],
+#         missing_component_behavior="error")
+#     img = fn.decoders.image(img_raw, device="mixed", output_type=types.RGB)
+#     resized = fn.resize(img, device="gpu", resize_shorter=256.)
+#     output = fn.crop_mirror_normalize(
+#         resized,
+#         dtype=types.FLOAT,
+#         crop=(224, 224),
+#         mean=[0., 0., 0.],
+#         std=[1., 1., 1.])
 
 def main():
     args = parser.parse_args()
@@ -312,40 +312,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> Dummy data is used!")
         train_dataset = datasets.FakeData(1281167, (3, 224, 224), 1000, transforms.ToTensor())
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
-    else:
-#         traindir = os.path.join(args.data, 'train-jpeg')
-#         valdir = os.path.join(args.data, 'val-jpeg')
 
-#         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-#                                      std=[0.229, 0.224, 0.225])
-
-#         pipe_train = wds_pipeline(traindir)
-#         pipe_train.build()
-#         pipe_val = wds_pipeline(valdir)
-#         pipe_val.build()
-        pip_train = HybridTrainPipe(batch_size=TRAIN_BS, num_threads=NUM_WORKERS, device_id=0, data_dir=IMG_DIR+'/train', crop=CROP_SIZE, world_size=1, local_rank=0)
-        dali_loader = DALIDataloader(pipeline=pip_train, size=IMAGENET_IMAGES_NUM_TRAIN, batch_size=TRAIN_BS, onehot_label=True)
-
-        print("[DALI] train dataloader length: %d"%len(dali_loader))
-        print('[DALI] start iterate train dataloader')
-
-        # train_dataset = datasets.ImageFolder(
-        #     traindir,
-        #     transforms.Compose([
-        #         transforms.RandomResizedCrop(224),
-        #         transforms.RandomHorizontalFlip(),
-        #         transforms.ToTensor(),
-        #         normalize,
-        #     ]))
-
-        # val_dataset = datasets.ImageFolder(
-        #     valdir,
-        #     transforms.Compose([
-        #         transforms.Resize(256),
-        #         transforms.CenterCrop(224),
-        #         transforms.ToTensor(),
-        #         normalize,
-        #     ]))
 
     if args.distributed:     
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -355,20 +322,38 @@ def main_worker(gpu, ngpus_per_node, args):
         val_sampler = None
 
 
-    # train_loader = torch.utils.data.DataLoader(
-    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+    if args.dali:
+        pip_train = HybridTrainPipe(batch_size=args.batch_size, num_threads=args.workers, device_id=0, data_dir=IMG_DIR+'/train', crop=CROP_SIZE, world_size=1, local_rank=0)
+        train_loader = DALIDataloader(pipeline=pip_train, size=IMAGENET_IMAGES_NUM_TRAIN, batch_size=TRAIN_BS, onehot_label=True)
 
+        print("[DALI] train dataloader length: %d"%len(train_loader))
+        print('[DALI] start iterate train dataloader')
+        pip_test = HybridValPipe(batch_size=TEST_BS, num_threads=NUM_WORKERS, device_id=0, data_dir=IMG_DIR+'/val', crop=CROP_SIZE, size=VAL_SIZE, world_size=1, local_rank=0)
+        val_loader = DALIDataloader(pipeline=pip_test, size=IMAGENET_IMAGES_NUM_TEST, batch_size=TEST_BS, onehot_label=True)
+    else:
+        transform_train = transforms.Compose([
+            transforms.RandomResizedCrop(CROP_SIZE, scale=(0.08, 1.25)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        train_dst = datasets.ImageFolder(IMG_DIR+'/train', transform_train)
+        train_loader = torch.utils.data.DataLoader(train_dst, batch_size=TRAIN_BS, shuffle=True, pin_memory=True, num_workers=NUM_WORKERS)
+        print("[PyTorch] train dataloader length: %d"%len(train_loader))
+        print('[PyTorch] start iterate train dataloader')
+        transform_test = transforms.Compose([
+            transforms.Resize(VAL_SIZE),
+            transforms.CenterCrop(CROP_SIZE),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        test_dst = datasets.ImageFolder(IMG_DIR+'/val', transform_test)
+        val_loader = torch.utils.data.DataLoader(test_dst, batch_size=TEST_BS, shuffle=False, pin_memory=True, num_workers=NUM_WORKERS)
+    
+    
     # val_loader = torch.utils.data.DataLoader(
-    #     val_dataset, batch_size=args.batch_size, shuffle=False,
+    #     pipe_val, batch_size=args.batch_size, shuffle=False,
     #     num_workers=args.workers, pin_memory=True, sampler=val_sampler)
-    train_loader = torch.utils.data.DataLoader(
-        pipe_train, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
-    val_loader = torch.utils.data.DataLoader(
-        pipe_val, batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     if args.evaluate:
         validate(val_loader, model, criterion, args)
@@ -417,6 +402,7 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
     model.train()
 
     end = time.time()
+    itr_max = 100
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -446,6 +432,8 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
 
         if i % args.print_freq == 0:
             progress.display(i + 1)
+        if i > itr_max:
+            break;
 
 
 def validate(val_loader, model, criterion, args):
@@ -453,6 +441,8 @@ def validate(val_loader, model, criterion, args):
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
             end = time.time()
+            itr_max = 100
+            
             for i, (images, target) in enumerate(loader):
                 i = base_progress + i
                 if args.gpu is not None and torch.cuda.is_available():
@@ -479,6 +469,8 @@ def validate(val_loader, model, criterion, args):
 
                 if i % args.print_freq == 0:
                     progress.display(i + 1)
+                if i > itr_max: 
+                    break
 
     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
     losses = AverageMeter('Loss', ':.4e', Summary.NONE)
